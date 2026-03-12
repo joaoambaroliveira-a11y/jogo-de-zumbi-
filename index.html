@@ -2,145 +2,121 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Zombie Survival JS</title>
+    <title>Zumbi Survival - Health Bar</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #1a1a1a; font-family: sans-serif; }
-        canvas { display: block; background: #222; }
-        #ui { position: absolute; top: 10px; left: 10px; color: white; font-size: 20px; pointer-events: none; }
+        body { background: #1a1a1a; color: white; font-family: 'Courier New', Courier, monospace; text-align: center; }
+        
+        /* Estilo da Barra de Vida */
+        #container-vida {
+            width: 400px;
+            height: 25px;
+            background-color: #444;
+            border: 2px solid #fff;
+            margin: 10px auto;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        #barra-progresso {
+            width: 100%;
+            height: 100%;
+            background-color: #2ecc71; /* Verde inicial */
+            transition: width 0.2s, background-color 0.3s;
+        }
+
+        #cenario { 
+            position: relative; 
+            width: 800px; height: 500px; 
+            background: #222; margin: 20px auto; 
+            border: 4px solid #555; cursor: crosshair;
+            overflow: hidden;
+        }
+
+        .zumbi { 
+            position: absolute; 
+            width: 60px; height: 60px; 
+            font-size: 40px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            user-select: none;
+        }
     </style>
 </head>
 <body>
 
-    <div id="ui">Pontos: <span id="score">0</span></div>
-    <canvas id="gameCanvas"></canvas>
-
-<script>
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-const scoreElement = document.getElementById('score');
-
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
-
-let score = 0;
-let gameOver = false;
-
-// Configurações do Jogador
-const player = {
-    x: canvas.width / 2,
-    y: canvas.height / 2,
-    radius: 15,
-    color: '#0095DD',
-    speed: 5
-};
-
-const projectiles = [];
-const enemies = [];
-const keys = {};
-
-// Controles
-window.addEventListener('keydown', (e) => keys[e.key] = true);
-window.addEventListener('keyup', (e) => keys[e.key] = false);
-
-// Atirar ao clicar
-window.addEventListener('click', (event) => {
-    if(gameOver) return;
-    const angle = Math.atan2(event.clientY - player.y, event.clientX - player.x);
-    projectiles.push({
-        x: player.x,
-        y: player.y,
-        radius: 5,
-        color: 'yellow',
-        velocity: { x: Math.cos(angle) * 8, y: Math.sin(angle) * 8 }
-    });
-});
-
-function spawnEnemy() {
-    setInterval(() => {
-        if(gameOver) return;
-        let x, y;
-        if (Math.random() < 0.5) {
-            x = Math.random() < 0.5 ? 0 - 30 : canvas.width + 30;
-            y = Math.random() * canvas.height;
-        } else {
-            x = Math.random() * canvas.width;
-            y = Math.random() < 0.5 ? 0 - 30 : canvas.height + 30;
-        }
-        const angle = Math.atan2(player.y - y, player.x - x);
-        enemies.push({
-            x, y, radius: 20, color: '#ff4d4d',
-            velocity: { x: Math.cos(angle) * 2, y: Math.sin(angle) * 2 }
-        });
-    }, 1000);
-}
-
-function animate() {
-    if(gameOver) {
-        ctx.fillStyle = "white";
-        ctx.font = "40px Arial";
-        ctx.fillText("FIM DE JOGO! Recarregue a página.", canvas.width/2 - 300, canvas.height/2);
-        return;
-    }
+    <h1>ZUMBI SURVIVAL</h1>
     
-    requestAnimationFrame(animate);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    <div id="container-vida">
+        <div id="barra-progresso"></div>
+    </div>
+    
+    <div id="status">Vida: 100% | Pontos: 0</div>
+    
+    <div id="cenario"></div>
 
-    // Movimento do Jogador
-    if (keys['w'] && player.y > 0) player.y -= player.speed;
-    if (keys['s'] && player.y < canvas.height) player.y += player.speed;
-    if (keys['a'] && player.x > 0) player.x -= player.speed;
-    if (keys['d'] && player.x < canvas.width) player.x += player.speed;
+    <script>
+        let pontos = 0;
+        let vida = 100;
+        let jogoAtivo = true;
 
-    // Desenhar Jogador
-    ctx.beginPath();
-    ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
-    ctx.fillStyle = player.color;
-    ctx.fill();
-    ctx.closePath();
+        const cenario = document.getElementById('cenario');
+        const barra = document.getElementById('barra-progresso');
+        const statusTexto = document.getElementById('status');
 
-    // Lógica Projéteis
-    projectiles.forEach((p, i) => {
-        p.x += p.velocity.x;
-        p.y += p.velocity.y;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-        ctx.fillStyle = p.color;
-        ctx.fill();
-        if (p.x < 0 || p.x > canvas.width || p.y < 0 || p.y > canvas.height) projectiles.splice(i, 1);
-    });
+        function atualizarInterface() {
+            barra.style.width = vida + "%";
+            statusTexto.innerText = `Vida: ${vida}% | Pontos: ${pontos}`;
 
-    // Lógica Inimigos (Zumbis)
-    enemies.forEach((enemy, index) => {
-        const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
-        enemy.velocity.x = Math.cos(angle) * 2;
-        enemy.velocity.y = Math.sin(angle) * 2;
-        enemy.x += enemy.velocity.x;
-        enemy.y += enemy.velocity.y;
-
-        ctx.beginPath();
-        ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
-        ctx.fillStyle = enemy.color;
-        ctx.fill();
-
-        // Colisão Zumbi com Jogador
-        const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
-        if (dist - enemy.radius - player.radius < 1) gameOver = true;
-
-        // Colisão Zumbi com Projétil
-        projectiles.forEach((p, pIndex) => {
-            const d = Math.hypot(p.x - enemy.x, p.y - enemy.y);
-            if (d - enemy.radius - p.radius < 1) {
-                enemies.splice(index, 1);
-                projectiles.splice(pIndex, 1);
-                score += 10;
-                scoreElement.innerHTML = score;
+            // Muda cor da barra conforme a vida desce
+            if (vida <= 30) {
+                barra.style.backgroundColor = "#e74c3c"; // Vermelho
+            } else if (vida <= 60) {
+                barra.style.backgroundColor = "#f1c40f"; // Amarelo
             }
-        });
-    });
-}
+        }
 
-spawnEnemy();
-animate();
-</script>
+        function criarZumbi() {
+            if (!jogoAtivo) return;
+
+            const zumbi = document.createElement('div');
+            zumbi.className = 'zumbi';
+            zumbi.innerHTML = '🧟';
+            
+            zumbi.style.left = Math.random() * 740 + 'px';
+            zumbi.style.top = Math.random() * 440 + 'px';
+
+            let clicado = false;
+
+            zumbi.onclick = function() {
+                if (!jogoAtivo) return;
+                clicado = true;
+                pontos += 10;
+                atualizarInterface();
+                this.remove();
+            };
+
+            cenario.appendChild(zumbi);
+
+            // Se o jogador não clicar em 1.2 segundos, perde vida
+            setTimeout(() => {
+                if (!clicado && jogoAtivo) {
+                    vida -= 10;
+                    atualizarInterface();
+                    zumbi.style.filter = "grayscale(100%)"; // Efeito visual de falha
+                    setTimeout(() => zumbi.remove(), 200);
+
+                    if (vida <= 0) gameOver();
+                }
+            }, 1200);
+        }
+
+        function gameOver() {
+            jogoAtivo = false;
+            alert("GAME OVER! Você sobreviveu com " + pontos + " pontos.");
+            location.reload(); // Reinicia o jogo
+        }
+
+        // Gera zumbis infinitamente
+        setInterval(criarZumbi, 800);
+    </script>
 </body>
 </html>
