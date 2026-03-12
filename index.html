@@ -1,3 +1,20 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Zombie Survival JS</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #1a1a1a; font-family: sans-serif; }
+        canvas { display: block; background: #222; }
+        #ui { position: absolute; top: 10px; left: 10px; color: white; font-size: 20px; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+    <div id="ui">Pontos: <span id="score">0</span></div>
+    <canvas id="gameCanvas"></canvas>
+
+<script>
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const scoreElement = document.getElementById('score');
@@ -8,12 +25,7 @@ canvas.height = window.innerHeight;
 let score = 0;
 let gameOver = false;
 
-// --- NOVAS VARIÁVEIS DE MUNIÇÃO ---
-const maxAmmo = 10;           // Capacidade do pente
-let currentAmmo = maxAmmo;    // Munição atual
-let isReloading = false;      // Status de recarga
-const reloadTime = 1500;      // Tempo de recarga (1.5 segundos)
-
+// Configurações do Jogador
 const player = {
     x: canvas.width / 2,
     y: canvas.height / 2,
@@ -26,50 +38,33 @@ const projectiles = [];
 const enemies = [];
 const keys = {};
 
+// Controles
 window.addEventListener('keydown', (e) => keys[e.key] = true);
 window.addEventListener('keyup', (e) => keys[e.key] = false);
 
-// --- LÓGICA DE TIRO COM RECARGA ---
+// Atirar ao clicar
 window.addEventListener('click', (event) => {
-    if(gameOver || isReloading) return;
-
-    if (currentAmmo > 0) {
-        const angle = Math.atan2(event.clientY - player.y, event.clientX - player.x);
-        projectiles.push({
-            x: player.x,
-            y: player.y,
-            radius: 5,
-            color: 'yellow',
-            velocity: { x: Math.cos(angle) * 8, y: Math.sin(angle) * 8 }
-        });
-        
-        currentAmmo--; // Gasta uma bala
-
-        // Se acabar a munição, inicia o recarregamento automático
-        if (currentAmmo === 0) {
-            startReload();
-        }
-    }
+    if(gameOver) return;
+    const angle = Math.atan2(event.clientY - player.y, event.clientX - player.x);
+    projectiles.push({
+        x: player.x,
+        y: player.y,
+        radius: 5,
+        color: 'yellow',
+        velocity: { x: Math.cos(angle) * 8, y: Math.sin(angle) * 8 }
+    });
 });
-
-function startReload() {
-    isReloading = true;
-    setTimeout(() => {
-        currentAmmo = maxAmmo;
-        isReloading = false;
-    }, reloadTime);
-}
 
 function spawnEnemy() {
     setInterval(() => {
         if(gameOver) return;
         let x, y;
         if (Math.random() < 0.5) {
-            x = Math.random() < 0.5 ? -30 : canvas.width + 30;
+            x = Math.random() < 0.5 ? 0 - 30 : canvas.width + 30;
             y = Math.random() * canvas.height;
         } else {
             x = Math.random() * canvas.width;
-            y = Math.random() < 0.5 ? -30 : canvas.height + 30;
+            y = Math.random() < 0.5 ? 0 - 30 : canvas.height + 30;
         }
         const angle = Math.atan2(player.y - y, player.x - x);
         enemies.push({
@@ -83,20 +78,14 @@ function animate() {
     if(gameOver) {
         ctx.fillStyle = "white";
         ctx.font = "40px Arial";
-        ctx.fillText("FIM DE JOGO!", canvas.width/2 - 100, canvas.height/2);
+        ctx.fillText("FIM DE JOGO! Recarregue a página.", canvas.width/2 - 300, canvas.height/2);
         return;
     }
     
     requestAnimationFrame(animate);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Interface (UI) de Munição
-    ctx.fillStyle = "white";
-    ctx.font = "20px Arial";
-    let ammoText = isReloading ? "RECARREGANDO..." : `Munição: ${currentAmmo} / ${maxAmmo}`;
-    ctx.fillText(ammoText, 10, 60);
-
-    // Movimento
+    // Movimento do Jogador
     if (keys['w'] && player.y > 0) player.y -= player.speed;
     if (keys['s'] && player.y < canvas.height) player.y += player.speed;
     if (keys['a'] && player.x > 0) player.x -= player.speed;
@@ -107,8 +96,9 @@ function animate() {
     ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
     ctx.fillStyle = player.color;
     ctx.fill();
+    ctx.closePath();
 
-    // Projéteis
+    // Lógica Projéteis
     projectiles.forEach((p, i) => {
         p.x += p.velocity.x;
         p.y += p.velocity.y;
@@ -119,21 +109,27 @@ function animate() {
         if (p.x < 0 || p.x > canvas.width || p.y < 0 || p.y > canvas.height) projectiles.splice(i, 1);
     });
 
-    // Inimigos
+    // Lógica Inimigos (Zumbis)
     enemies.forEach((enemy, index) => {
         const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
-        enemy.x += Math.cos(angle) * 2;
-        enemy.y += Math.sin(angle) * 2;
+        enemy.velocity.x = Math.cos(angle) * 2;
+        enemy.velocity.y = Math.sin(angle) * 2;
+        enemy.x += enemy.velocity.x;
+        enemy.y += enemy.velocity.y;
 
         ctx.beginPath();
         ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
         ctx.fillStyle = enemy.color;
         ctx.fill();
 
-        if (Math.hypot(player.x - enemy.x, player.y - enemy.y) < player.radius + enemy.radius) gameOver = true;
+        // Colisão Zumbi com Jogador
+        const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+        if (dist - enemy.radius - player.radius < 1) gameOver = true;
 
+        // Colisão Zumbi com Projétil
         projectiles.forEach((p, pIndex) => {
-            if (Math.hypot(p.x - enemy.x, p.y - enemy.y) < p.radius + enemy.radius) {
+            const d = Math.hypot(p.x - enemy.x, p.y - enemy.y);
+            if (d - enemy.radius - p.radius < 1) {
                 enemies.splice(index, 1);
                 projectiles.splice(pIndex, 1);
                 score += 10;
@@ -145,3 +141,6 @@ function animate() {
 
 spawnEnemy();
 animate();
+</script>
+</body>
+</html>
