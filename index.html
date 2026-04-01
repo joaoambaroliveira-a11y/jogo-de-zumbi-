@@ -1,57 +1,3 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <title>Zombie Survival - Continue</title>
-    <style>
-        body { margin: 0; overflow: hidden; background: #1a1a1a; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        canvas { display: block; background: #222; }
-        
-        #ui { 
-            position: absolute; top: 20px; left: 20px; color: white; 
-            font-size: 24px; pointer-events: none; text-shadow: 2px 2px 4px #000;
-        }
-
-        /* Tela de Game Over */
-        #gameOverScreen {
-            position: absolute; top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            display: none; /* Escondido por padrão */
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            color: white;
-            z-index: 10;
-        }
-
-        #gameOverScreen h1 { font-size: 60px; color: #ff4d4d; margin-bottom: 10px; }
-        
-        #btnRestart {
-            padding: 15px 40px; font-size: 20px; cursor: pointer;
-            background: #0095DD; color: white; border: none; border-radius: 5px;
-            transition: background 0.3s;
-        }
-
-        #btnRestart:hover { background: #007bbd; }
-    </style>
-</head>
-<body>
-
-    <div id="ui">
-        <div>Pontos: <span id="score">0</span></div>
-        <div id="ammoDisplay">Munição: 10 / 10</div>
-    </div>
-
-    <div id="gameOverScreen">
-        <h1>VOCÊ MORREU!</h1>
-        <p id="finalScore">Pontuação: 0</p>
-        <button id="btnRestart">Tentar Novamente</button>
-    </div>
-
-    <canvas id="gameCanvas"></canvas>
-
-<script>
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const scoreElement = document.getElementById('score');
@@ -63,13 +9,15 @@ const btnRestart = document.getElementById('btnRestart');
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// Variáveis do Jogo
 let score, gameOver, currentAmmo, isReloading, player, projectiles, enemies;
-const maxAmmo = 10;
+const maxAmmo = 15; // Aumentei um pouco a munição para o modo automático
 const reloadTime = 1500;
+const fireRate = 150; // Velocidade do tiro automático (milissegundos)
+let isMouseDown = false;
+let fireTimer = null;
+let mousePos = { x: 0, y: 0 };
 const keys = {};
 
-// Inicializar ou Resetar o Jogo
 function init() {
     score = 0;
     gameOver = false;
@@ -77,40 +25,64 @@ function init() {
     isReloading = false;
     projectiles = [];
     enemies = [];
-    
-    player = {
-        x: canvas.width / 2,
-        y: canvas.height / 2,
-        radius: 15,
-        color: '#0095DD',
-        speed: 5
-    };
+    player = { x: canvas.width / 2, y: canvas.height / 2, radius: 15, color: '#0095DD', speed: 5 };
 
     scoreElement.innerHTML = score;
-    ammoElement.innerHTML = `Munição: ${currentAmmo} / ${maxAmmo}`;
+    updateAmmoUI();
     gameOverScreen.style.display = 'none';
-    
     animate();
 }
 
-// Controles
-window.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
-window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
-
-window.addEventListener('click', (event) => {
-    if(gameOver || isReloading) return;
-
-    if (currentAmmo > 0) {
-        const angle = Math.atan2(event.clientY - player.y, event.clientX - player.x);
-        projectiles.push({
-            x: player.x, y: player.y, radius: 5, color: 'yellow',
-            velocity: { x: Math.cos(angle) * 8, y: Math.sin(angle) * 8 }
-        });
-        currentAmmo--;
-        updateAmmoUI();
-        if (currentAmmo === 0) startReload();
-    }
+// Rastrear posição do mouse para o tiro automático saber para onde olhar
+window.addEventListener('mousemove', (e) => {
+    mousePos.x = e.clientX;
+    mousePos.y = e.clientY;
 });
+
+// Lógica de Tiro Automático
+window.addEventListener('mousedown', () => {
+    isMouseDown = true;
+    startFiring();
+});
+
+window.addEventListener('mouseup', () => {
+    isMouseDown = false;
+    stopFiring();
+});
+
+function startFiring() {
+    if (fireTimer) return; // Evita duplicar o intervalo
+    shoot(); // Atira o primeiro logo no clique
+    fireTimer = setInterval(shoot, fireRate);
+}
+
+function stopFiring() {
+    clearInterval(fireTimer);
+    fireTimer = null;
+}
+
+function shoot() {
+    if (gameOver || isReloading || currentAmmo <= 0 || !isMouseDown) {
+        if (currentAmmo <= 0 && !isReloading) startReload();
+        return;
+    }
+
+    const angle = Math.atan2(mousePos.y - player.y, mousePos.x - player.x);
+    projectiles.push({
+        x: player.x,
+        y: player.y,
+        radius: 5,
+        color: 'yellow',
+        velocity: { x: Math.cos(angle) * 10, y: Math.sin(angle) * 10 }
+    });
+
+    currentAmmo--;
+    updateAmmoUI();
+    if (currentAmmo <= 0) {
+        stopFiring();
+        startReload();
+    }
+}
 
 function startReload() {
     isReloading = true;
@@ -119,6 +91,8 @@ function startReload() {
         currentAmmo = maxAmmo;
         isReloading = false;
         updateAmmoUI();
+        // Se o jogador ainda estiver segurando o mouse após recarregar, volta a atirar
+        if (isMouseDown) startFiring(); 
     }, reloadTime);
 }
 
@@ -126,8 +100,12 @@ function updateAmmoUI() {
     ammoElement.innerHTML = isReloading ? "RECARREGANDO..." : `Munição: ${currentAmmo} / ${maxAmmo}`;
 }
 
-// Criar Zumbis periodicamente
-let spawnInterval = setInterval(() => {
+// Restante dos controles e lógica de movimento
+window.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
+window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
+
+// Spawn de inimigos
+setInterval(() => {
     if(gameOver) return;
     let x, y;
     if (Math.random() < 0.5) {
@@ -140,29 +118,25 @@ let spawnInterval = setInterval(() => {
     const angle = Math.atan2(player.y - y, player.x - x);
     enemies.push({
         x, y, radius: 20, color: '#ff4d4d',
-        velocity: { x: Math.cos(angle) * 2, y: Math.sin(angle) * 2 }
+        velocity: { x: Math.cos(angle) * 2.5, y: Math.sin(angle) * 2.5 }
     });
-}, 1000);
+}, 800); // Zumbis aparecem um pouco mais rápido agora
 
 function animate() {
-    if(gameOver) return; // Para a animação
-    
+    if(gameOver) return;
     requestAnimationFrame(animate);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Movimento do Jogador
     if (keys['w'] && player.y > 0) player.y -= player.speed;
     if (keys['s'] && player.y < canvas.height) player.y += player.speed;
     if (keys['a'] && player.x > 0) player.x -= player.speed;
     if (keys['d'] && player.x < canvas.width) player.x += player.speed;
 
-    // Desenhar Jogador
     ctx.beginPath();
     ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
     ctx.fillStyle = player.color;
     ctx.fill();
 
-    // Projéteis
     projectiles.forEach((p, i) => {
         p.x += p.velocity.x;
         p.y += p.velocity.y;
@@ -173,23 +147,21 @@ function animate() {
         if (p.x < 0 || p.x > canvas.width || p.y < 0 || p.y > canvas.height) projectiles.splice(i, 1);
     });
 
-    // Inimigos
     enemies.forEach((enemy, index) => {
         const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
         enemy.x += Math.cos(angle) * 2;
         enemy.y += Math.sin(angle) * 2;
-
         ctx.beginPath();
         ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
         ctx.fillStyle = enemy.color;
         ctx.fill();
 
-        // Colisão com Jogador (Perder)
         if (Math.hypot(player.x - enemy.x, player.y - enemy.y) < player.radius + enemy.radius) {
-            endGame();
+            gameOver = true;
+            finalScoreElement.innerHTML = `Pontuação Final: ${score}`;
+            gameOverScreen.style.display = 'flex';
         }
 
-        // Colisão com Projétil (Morte do Zumbi)
         projectiles.forEach((p, pIndex) => {
             if (Math.hypot(p.x - enemy.x, p.y - enemy.y) < p.radius + enemy.radius) {
                 enemies.splice(index, 1);
@@ -201,19 +173,5 @@ function animate() {
     });
 }
 
-function endGame() {
-    gameOver = true;
-    finalScoreElement.innerHTML = `Pontuação Final: ${score}`;
-    gameOverScreen.style.display = 'flex';
-}
-
-// Botão Tentar Novamente
-btnRestart.addEventListener('click', () => {
-    init();
-});
-
-// Início inicial
+btnRestart.addEventListener('click', init);
 init();
-</script>
-</body>
-</html>
