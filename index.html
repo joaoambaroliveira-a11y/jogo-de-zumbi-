@@ -1,219 +1,223 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <title>Zombie Survival - Continue</title>
-    <style>
-        body { margin: 0; overflow: hidden; background: #1a1a1a; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        canvas { display: block; background: #222; }
+import pygame
+import sys
+
+# Inicialização do Pygame
+pygame.init()
+
+# Configurações da Janela
+LARGURA, ALTURA = 800, 600
+tela = pygame.display.set_mode((LARGURA, ALTURA))
+pygame.display.set_caption("Super Soccer Simulator")
+relogio = pygame.time.Clock()
+
+# Cores
+VERDE_CAMPO = (34, 139, 34)
+LINHA_CAMPO = (255, 255, 255)
+BRANCO = (255, 255, 255)
+PRETO = (0, 0, 0)
+CINZA = (200, 200, 200)
+AZUL_BOTAO = (30, 144, 255)
+BOTAO_HOVER = (65, 105, 225)
+JOGADOR_COR = (255, 0, 0)
+ADVERSARIO_COR = (0, 0, 255)
+
+# Fontes
+fonte_titulo = pygame.font.SysFont("Arial", 50, bold=True)
+fonte_texto = pygame.font.SysFont("Arial", 30)
+fonte_pequena = pygame.font.SysFont("Arial", 20)
+
+# Estados do Jogo
+TELA_LOGIN = 0
+TELA_MODO = 1
+EM_JOGO = 2
+estado_atual = TELA_LOGIN
+
+# Variáveis do Jogo
+nome_usuario = ""
+modo_jogo = ""
+gols_jogador = 0
+gols_adversario = 0
+tempo_jogo = 0 # Usado no modo Clássico
+
+# Entidades do Jogo (Posições iniciais)
+jog_x, jog_y = 200, 300
+adv_x, adv_y = 600, 300
+bola_x, bola_y = 400, 300
+bola_vel_x, bola_vel_y = 0, 0
+
+def reiniciar_posicoes():
+    global jog_x, jog_y, adv_x, adv_y, bola_x, bola_y, bola_vel_x, bola_vel_y
+    jog_x, jog_y = 200, 300
+    adv_x, adv_y = 600, 300
+    bola_x, bola_y = 400, 300
+    bola_vel_x, bola_vel_y = 0, 0
+
+# --- LOOP PRINCIPAL ---
+while True:
+    relogio.tick(60) # 60 FPS
+    
+    # 1. TRATAMENTO DE EVENTOS
+    for evento in pygame.event.get():
+        if evento.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
+            
+        if estado_atual == TELA_LOGIN:
+            if evento.type == pygame.KEYDOWN:
+                if evento.key == pygame.K_RETURN:
+                    if nome_usuario.strip() != "":
+                        estado_atual = TELA_MODO
+                elif evento.key == pygame.K_BACKSPACE:
+                    nome_usuario = nome_usuario[:-1]
+                else:
+                    # Limita o nome a 12 caracteres
+                    if len(nome_usuario) < 12 and evento.unicode.isalnum():
+                        nome_usuario += evento.unicode
+                        
+        elif estado_atual == TELA_MODO:
+            if evento.type == pygame.MOUSEBUTTONDOWN:
+                mouse_pos = pygame.mouse.get_pos()
+                # Botão Amistoso
+                if 150 <= mouse_pos[0] <= 350 and 300 <= mouse_pos[1] <= 380:
+                    modo_jogo = "Amistoso"
+                    estado_atual = EM_JOGO
+                    tempo_jogo = 0
+                # Botão Clássico
+                if 450 <= mouse_pos[0] <= 650 and 300 <= mouse_pos[1] <= 380:
+                    modo_jogo = "Clássico"
+                    estado_atual = EM_JOGO
+                    tempo_jogo = 1800 # Ex: 30 segundos de jogo (1800 frames)
+
+    # 2. LÓGICA DO JOGO E DESENHO DA TELA
+    tela.fill(PRETO)
+    
+    # --- TELA DE LOGIN ---
+    if estado_atual == TELA_LOGIN:
+        txt_titulo = fonte_titulo.render("FUTEBOL STRIKER", True, BRANCO)
+        tela.blit(txt_titulo, (LARGURA//2 - txt_titulo.get_width()//2, 100))
         
-        #ui { 
-            position: absolute; top: 20px; left: 20px; color: white; 
-            font-size: 24px; pointer-events: none; text-shadow: 2px 2px 4px #000;
-        }
-
-        /* Tela de Game Over */
-        #gameOverScreen {
-            position: absolute; top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            display: none; /* Escondido por padrão */
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            color: white;
-            z-index: 10;
-        }
-
-        #gameOverScreen h1 { font-size: 60px; color: #ff4d4d; margin-bottom: 10px; }
+        txt_instrucao = fonte_texto.render("Digite seu nome de usuário:", True, CINZA)
+        tela.blit(txt_instrucao, (LARGURA//2 - txt_instrucao.get_width()//2, 230))
         
-        #btnRestart {
-            padding: 15px 40px; font-size: 20px; cursor: pointer;
-            background: #0095DD; color: white; border: none; border-radius: 5px;
-            transition: background 0.3s;
-        }
+        # Caixa de texto
+        pygame.draw.rect(tela, BRANCO, (LARGURA//2 - 150, 300, 300, 50), border_radius=5)
+        txt_nome = fonte_texto.render(nome_usuario, True, PRETO)
+        tela.blit(txt_nome, (LARGURA//2 - 140, 310))
+        
+        txt_aviso = fonte_pequena.render("Pressione ENTER para continuar", True, CINZA)
+        tela.blit(txt_aviso, (LARGURA//2 - txt_aviso.get_width()//2, 380))
 
-        #btnRestart:hover { background: #007bbd; }
-    </style>
-</head>
-<body>
+    # --- TELA DE SELEÇÃO DE MODO ---
+    elif estado_atual == TELA_MODO:
+        txt_boas_vindas = fonte_titulo.render(f"Olá, {nome_usuario}!", True, BRANCO)
+        tela.blit(txt_boas_vindas, (LARGURA//2 - txt_boas_vindas.get_width()//2, 100))
+        
+        txt_escolha = fonte_texto.render("Escolha o tipo de jogo:", True, CINZA)
+        tela.blit(txt_escolha, (LARGURA//2 - txt_escolha.get_width()//2, 200))
+        
+        # Botões de modo de jogo
+        mouse_pos = pygame.mouse.get_pos()
+        
+        # Amistoso
+        cor_am = BOTAO_HOVER if 150 <= mouse_pos[0] <= 350 and 300 <= mouse_pos[1] <= 380 else AZUL_BOTAO
+        pygame.draw.rect(tela, cor_am, (150, 300, 200, 80), border_radius=10)
+        txt_am = fonte_texto.render("Amistoso", True, BRANCO)
+        tela.blit(txt_am, (250 - txt_am.get_width()//2, 325))
+        
+        # Clássico
+        cor_cl = BOTAO_HOVER if 450 <= mouse_pos[0] <= 650 and 300 <= mouse_pos[1] <= 380 else AZUL_BOTAO
+        pygame.draw.rect(tela, cor_cl, (450, 300, 200, 80), border_radius=10)
+        txt_cl = fonte_texto.render("Clássico", True, BRANCO)
+        tela.blit(txt_cl, (550 - txt_cl.get_width()//2, 325))
+        
+        # Descrições simples
+        desc_am = fonte_pequena.render("Sem limite de tempo.", True, CINZA)
+        desc_cl = fonte_pequena.render("Jogo rápido com tempo.", True, CINZA)
+        tela.blit(desc_am, (250 - desc_am.get_width()//2, 390))
+        tela.blit(desc_cl, (550 - desc_cl.get_width()//2, 390))
 
-    <div id="ui">
-        <div>Pontos: <span id="score">0</span></div>
-        <div id="ammoDisplay">Munição: 10 / 10</div>
-    </div>
+    # --- EM JOGO (GAMEPLAY) ---
+    elif estado_atual == EM_JOGO:
+        # Movimentação do Jogador (Setas)
+        teclas = pygame.key.get_pressed()
+        if teclas[pygame.K_LEFT] and jog_x > 20: jog_x -= 5
+        if teclas[pygame.K_RIGHT] and jog_x < LARGURA - 20: jog_x += 5
+        if teclas[pygame.K_UP] and jog_y > 20: jog_y -= 5
+        if teclas[pygame.K_DOWN] and jog_y < ALTURA - 20: jog_y += 5
+        
+        # IA do Adversário bem simples (segue a bola se ela estiver do lado dele)
+        if adv_x > bola_x and adv_x > 400: adv_x -= 3
+        if adv_x < bola_x: adv_x += 3
+        if adv_y > bola_y: adv_y -= 3
+        if adv_y < bola_y: adv_y += 3
 
-    <div id="gameOverScreen">
-        <h1>VOCÊ MORREU!</h1>
-        <p id="finalScore">Pontuação: 0</p>
-        <button id="btnRestart">Tentar Novamente</button>
-    </div>
+        # Lógica do Modo Clássico (Contagem regressiva)
+        if modo_jogo == "Clássico":
+            tempo_jogo -= 1
+            if tempo_jogo <= 0:
+                estado_atual = TELA_MODO # Volta para a seleção quando o tempo acaba
+                gols_jogador = 0
+                gols_adversario = 0
+                reiniciar_posicoes()
 
-    <canvas id="gameCanvas"></canvas>
+        # Física da bola (atrito básico)
+        bola_x += bola_vel_x
+        bola_y += bola_vel_y
+        bola_vel_x *= 0.95
+        bola_vel_y *= 0.95
 
-<script>
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-const scoreElement = document.getElementById('score');
-const ammoElement = document.getElementById('ammoDisplay');
-const gameOverScreen = document.getElementById('gameOverScreen');
-const finalScoreElement = document.getElementById('finalScore');
-const btnRestart = document.getElementById('btnRestart');
+        # Colisão Jogador -> Bola
+        dist_jog_bola = ((jog_x - bola_x)**2 + (jog_y - bola_y)**2)**0.5
+        if dist_jog_bola < 30: # Raio jogador(20) + Raio bola(10)
+            bola_vel_x = (bola_x - jog_x) * 0.5
+            bola_vel_y = (bola_y - jog_y) * 0.5
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+        # Colisão Adversário -> Bola
+        dist_adv_bola = ((adv_x - bola_x)**2 + (adv_y - bola_y)**2)**0.5
+        if dist_adv_bola < 30:
+            bola_vel_x = (bola_x - adv_x) * 0.5
+            bola_vel_y = (bola_y - adv_y) * 0.5
 
-// Variáveis do Jogo
-let score, gameOver, currentAmmo, isReloading, player, projectiles, enemies;
-const maxAmmo = 10;
-const reloadTime = 1500;
-const keys = {};
+        # Colisão da bola com as bordas do campo
+        if bola_y <= 15 or bola_y >= ALTURA - 15:
+            bola_vel_y *= -1
+        if bola_x <= 15 or bola_x >= LARGURA - 15:
+            # Verifica se foi Gol nas traves centrais (entre Y=200 e Y=400)
+            if 200 <= bola_y <= 400:
+                if bola_x <= 15:
+                    gols_adversario += 1
+                else:
+                    gols_jogador += 1
+                reiniciar_posicoes()
+            else:
+                bola_vel_x *= -1
 
-// Inicializar ou Resetar o Jogo
-function init() {
-    score = 0;
-    gameOver = false;
-    currentAmmo = maxAmmo;
-    isReloading = false;
-    projectiles = [];
-    enemies = [];
-    
-    player = {
-        x: canvas.width / 2,
-        y: canvas.height / 2,
-        radius: 15,
-        color: '#0095DD',
-        speed: 5
-    };
+        # --- DESENHO DO CAMPO ---
+        tela.fill(VERDE_CAMPO)
+        # Linhas do campo
+        pygame.draw.rect(tela, LINHA_CAMPO, (10, 10, LARGURA-20, ALTURA-20), 3)
+        pygame.draw.line(tela, LINHA_CAMPO, (LARGURA//2, 10), (LARGURA//2, ALTURA-10), 3)
+        pygame.draw.circle(tela, LINHA_CAMPO, (LARGURA//2, ALTURA//2), 70, 3)
+        
+        # Gols (Traves)
+        pygame.draw.rect(tela, BRANCO, (0, 200, 15, 200))
+        pygame.draw.rect(tela, BRANCO, (LARGURA-15, 200, 15, 200))
 
-    scoreElement.innerHTML = score;
-    ammoElement.innerHTML = `Munição: ${currentAmmo} / ${maxAmmo}`;
-    gameOverScreen.style.display = 'none';
-    
-    animate();
-}
+        # Desenhar Personagens e Bola
+        pygame.draw.circle(tela, JOGADOR_COR, (int(jog_x), int(jog_y)), 20) # Jogador
+        pygame.draw.circle(tela, ADVERSARIO_COR, (int(adv_x), int(adv_y)), 20) # Adversário
+        pygame.draw.circle(tela, BRANCO, (int(bola_x), int(bola_y)), 10) # Bola
 
-// Controles
-window.addEventListener('keydown', (e) => keys[e.key.toLowerCase()] = true);
-window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
+        # Placar e Infos
+        txt_placar = fonte_texto.render(f"{nome_usuario} {gols_jogador} x {gols_adversario} Robô", True, BRANCO)
+        tela.blit(txt_placar, (LARGURA//2 - txt_placar.get_width()//2, 20))
+        
+        # Info do Modo no topo
+        txt_info_modo = fonte_pequena.render(f"Modo: {modo_jogo}", True, CINZA)
+        tela.blit(txt_info_modo, (20, 20))
+        
+        if modo_jogo == "Clássico":
+            txt_tempo = fonte_pequena.render(f"Tempo restante: {tempo_jogo // 60}s", True, CINZA)
+            tela.blit(txt_tempo, (LARGURA - 160, 20))
 
-window.addEventListener('click', (event) => {
-    if(gameOver || isReloading) return;
-
-    if (currentAmmo > 0) {
-        const angle = Math.atan2(event.clientY - player.y, event.clientX - player.x);
-        projectiles.push({
-            x: player.x, y: player.y, radius: 5, color: 'yellow',
-            velocity: { x: Math.cos(angle) * 8, y: Math.sin(angle) * 8 }
-        });
-        currentAmmo--;
-        updateAmmoUI();
-        if (currentAmmo === 0) startReload();
-    }
-});
-
-function startReload() {
-    isReloading = true;
-    updateAmmoUI();
-    setTimeout(() => {
-        currentAmmo = maxAmmo;
-        isReloading = false;
-        updateAmmoUI();
-    }, reloadTime);
-}
-
-function updateAmmoUI() {
-    ammoElement.innerHTML = isReloading ? "RECARREGANDO..." : `Munição: ${currentAmmo} / ${maxAmmo}`;
-}
-
-// Criar Zumbis periodicamente
-let spawnInterval = setInterval(() => {
-    if(gameOver) return;
-    let x, y;
-    if (Math.random() < 0.5) {
-        x = Math.random() < 0.5 ? -30 : canvas.width + 30;
-        y = Math.random() * canvas.height;
-    } else {
-        x = Math.random() * canvas.width;
-        y = Math.random() < 0.5 ? -30 : canvas.height + 30;
-    }
-    const angle = Math.atan2(player.y - y, player.x - x);
-    enemies.push({
-        x, y, radius: 20, color: '#ff4d4d',
-        velocity: { x: Math.cos(angle) * 2, y: Math.sin(angle) * 2 }
-    });
-}, 1000);
-
-function animate() {
-    if(gameOver) return; // Para a animação
-    
-    requestAnimationFrame(animate);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Movimento do Jogador
-    if (keys['w'] && player.y > 0) player.y -= player.speed;
-    if (keys['s'] && player.y < canvas.height) player.y += player.speed;
-    if (keys['a'] && player.x > 0) player.x -= player.speed;
-    if (keys['d'] && player.x < canvas.width) player.x += player.speed;
-
-    // Desenhar Jogador
-    ctx.beginPath();
-    ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
-    ctx.fillStyle = player.color;
-    ctx.fill();
-
-    // Projéteis
-    projectiles.forEach((p, i) => {
-        p.x += p.velocity.x;
-        p.y += p.velocity.y;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-        ctx.fillStyle = p.color;
-        ctx.fill();
-        if (p.x < 0 || p.x > canvas.width || p.y < 0 || p.y > canvas.height) projectiles.splice(i, 1);
-    });
-
-    // Inimigos
-    enemies.forEach((enemy, index) => {
-        const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
-        enemy.x += Math.cos(angle) * 2;
-        enemy.y += Math.sin(angle) * 2;
-
-        ctx.beginPath();
-        ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
-        ctx.fillStyle = enemy.color;
-        ctx.fill();
-
-        // Colisão com Jogador (Perder)
-        if (Math.hypot(player.x - enemy.x, player.y - enemy.y) < player.radius + enemy.radius) {
-            endGame();
-        }
-
-        // Colisão com Projétil (Morte do Zumbi)
-        projectiles.forEach((p, pIndex) => {
-            if (Math.hypot(p.x - enemy.x, p.y - enemy.y) < p.radius + enemy.radius) {
-                enemies.splice(index, 1);
-                projectiles.splice(pIndex, 1);
-                score += 10;
-                scoreElement.innerHTML = score;
-            }
-        });
-    });
-}
-
-function endGame() {
-    gameOver = true;
-    finalScoreElement.innerHTML = `Pontuação Final: ${score}`;
-    gameOverScreen.style.display = 'flex';
-}
-
-// Botão Tentar Novamente
-btnRestart.addEventListener('click', () => {
-    init();
-});
-
-// Início inicial
-init();
-</script>
-</body>
-</html>
+    pygame.display.flip()
